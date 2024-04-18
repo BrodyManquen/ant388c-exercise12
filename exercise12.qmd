@@ -1,0 +1,106 @@
+---
+title: "Exercise12"
+format: html
+---
+
+## Load Packages & Data
+
+```{r}
+library(tidyverse)
+library(naniar)
+d <- read_tsv("https://raw.githubusercontent.com/difiore/ada-2024-datasets/main/Mammal_lifehistories_v2.txt")
+```
+## Step 1: replace -999 with NA
+
+Use *replace_with_na_all* function from {naniar}
+```{r}
+d <- d %>% replace_with_na_all(condition=~.x==-999)
+d
+```
+
+## Step 2: drop litter size and refs
+```{r}
+d <- d %>% select(!c("litter size", refs))
+d
+```
+
+## Step 3: Log transform all numeric variables
+
+```{r}
+d <- d %>% mutate(across(where(is.numeric), log))
+d
+```
+
+## Step 4: Regress variables
+
+```{r}
+m1 <- lm(data=d, `mass(g)`~ `gestation(mo)`,na.action=na.exclude)
+r1 <- resid(m1)
+m2 <- lm(data=d, `mass(g)`~ `weaning(mo)`,na.action=na.exclude)
+r2 <- resid(m2)
+m3 <- lm(data=d, `mass(g)`~ `AFR(mo)`,na.action=na.exclude)
+r3 <- resid(m3)
+m4 <- lm(data=d, `mass(g)`~ `max. life(mo)`,na.action=na.exclude)
+r4 <- resid(m4)
+m5 <- lm(data=d, `mass(g)`~ `newborn(g)`,na.action=na.exclude)
+r5 <- resid(m5)
+m6 <- lm(data=d, `mass(g)`~ `wean mass(g)`,na.action=na.exclude)
+r6 <- resid(m6)
+```
+
+```{r}
+d <- d %>% mutate(relGest=r1, relWean=r2, relAFR=r3, relLife=r4, relNewbornMass=r5, relWeaningMass=r6)
+d
+```
+
+## Step 5: plots
+#### RelLife by Order:
+```{r}
+p1 <- ggplot(d, aes(x=order, y=relLife)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+p1
+```
+Perissodactyla seems to have the highest mean residual lifespan, though Cetacea has the highest when considering the 95% confidence interval.
+
+#### RelNewbornMass by Order
+```{r}
+p2 <- ggplot(d, aes(x=order, y=relNewbornMass)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+p2
+```
+Carnivora has the highest residual newborn mass.
+
+#### RelWeaningMass by Order
+```{r}
+p3 <- ggplot(d, aes(x=order, y=relWeaningMass)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+p3
+```
+
+Pholidota has the highest mean resdual weaning mass, although Lagomorpha seems to have the highest when considering the 95% confidence interval.
+
+## Step 6
+
+```{r}
+d<-d%>%drop_na(`max. life(mo)`,`AFR(mo)`, `gestation(mo)` , `newborn(g)`, `weaning(mo)`, `wean mass(g)`, `litters/year`,`mass(g)`)
+library(MASS)
+```
+
+```{r}
+m7 <- lm(data=d, `max. life(mo)` ~ `gestation(mo)` + `newborn(g)` + `weaning(mo)` + `wean mass(g)` + `litters/year` + `mass(g)`)
+
+s1 <- stepAIC(m7, scope=.~., direction="both")
+```
+
+```{r}
+summary(s1)
+```
+
+```{r}
+m8 <- lm(data=d, `AFR(mo)` ~ `gestation(mo)` + `newborn(g)` + `weaning(mo)` + `wean mass(g)` + `litters/year` + `mass(g)`)
+
+s2 <- stepAIC(m8, scope=.~., direction="both")
+```
+
+```{r}
+summary(s2)
+```
+
+Wean mass(g) and newborn(g) tend to appear in the 'top models'
